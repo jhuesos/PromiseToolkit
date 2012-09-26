@@ -6,13 +6,11 @@
  * @license MIT License
  */
 (function () {
-    "use strict";
+	"use strict";
 
-    TestCase("Promise", {
-        'test dummy test' : function () {
+	TestCase("Promise", {
+		'test dummy test' : function () {
 
-        }
-    });
-
-
+		}
+	});
 }());

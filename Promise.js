@@ -6,8 +6,7 @@
  * @license MIT License
  */
 (function () {
-    "use strict";
-
+	"use strict";
 
 
 }());
