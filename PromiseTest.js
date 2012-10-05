@@ -1,6 +1,5 @@
-/*jshint indent:4, browser:true, newcap:true */
-/*global Promise, AsyncTestCase, TestCase, assertTrue, assertFalse, assertFunction */
-
+/*jshint indent:4, browser:true */
+/*global Promise, AsyncTestCase, TestCase, assertTrue, assertFalse, assertFunction, assertEquals */
 /**
  * @author Jaime Vega (jhuesos@gmail.com)
  * @license MIT License
@@ -8,28 +7,39 @@
 (function () {
 	"use strict";
 
-	// Preparation code
+	// PREPARATION CODE
 
-	// AsyncFn is a method who simulates the behaviour of an async function called using setTimeout and uses Promise.
-	var asyncFn = function (successful) {
-		var fnToCall,
-			promise = new Promise(),
-			success = function () {
-				promise.resolve();
-			},
-			fail = function () {
-				promise.reject();
-			};
+    // AsyncFn is a method who simulates the behaviour of an async function called using setTimeout and uses Promise.
+    // Accepts an array which indicates if the async calls were successful or failed. For example: [true, false]
+    // will simulate two async consecutive calls, first successful and other failed.
+    var asyncMultipleCbs = function (successful, args) {
+            var promise = new Promise(),
+                success = function (arg) {
+                    promise.resolve(arg);
+                },
+                fail = function (arg) {
+                    promise.reject(arg);
+                },
+                asyncFn = function (successful, args) {
+                    setTimeout(function () {
+                        if (successful.shift()) {
+                            success(args.shift());
+                        } else {
+                            fail(args.shift());
+                        }
 
+                        if (successful.length > 0) {
+                            asyncFn(successful, args);
+                        }
+                    }, 10);
+                };
 
-		fnToCall = successful ? success : fail;
+            asyncFn(successful, args);
 
-		setTimeout(function () {
-			fnToCall();
-		}, 10);
+            return promise;
+        };
 
-		return promise;
-	};
+    // UNIT TESTS
 
 	// General Basic promise test suite
 	var PromiseTestSuite = new TestCase("Promise");
@@ -76,7 +86,7 @@
 				called = true;
 			});
 
-			asyncFn(true).then(fn);
+            asyncMultipleCbs([true], [1]).then(fn);
 
 			// At this point, since asyncFn is an async fn, called should be still false
 			assertFalse(called);
@@ -101,7 +111,7 @@
 				});
 
 			// Calling async fn with false, we make sure the "request" fails
-			asyncFn(false).then(successFn, rejectFn);
+            asyncMultipleCbs([false], [0]).then(successFn, rejectFn);
 
 			// At this point, since asyncFn is an async fn, called should be still false
 			assertFalse(rejectedCalled);
@@ -113,4 +123,36 @@
 			assertFalse(successCalled);
 		});
 	};
+
+    ThenTestSuite.prototype.testPromiseWithMultipleAsyncCallsAndArgs = function (queue) {
+        var successCalled = 0,
+            rejectedCalled = 0,
+            args = [];
+
+        queue.call("Step 1: Run async method with promises and rejected request", function (callbacks) {
+
+            var successFn = callbacks.add(function (arg) {
+                    successCalled += 1;
+                    args.push(arg);
+                }),
+                rejectFn = callbacks.add(function (arg) {
+                    rejectedCalled += 1;
+                    args.push(arg);
+                });
+
+            // Calling async fn with false, we make sure the "request" fails
+            asyncMultipleCbs([true, false], [1, 2]).then(successFn, rejectFn).then(successFn, rejectFn);
+
+            // At this point, since asyncFn is an async fn, called should be still false
+            assertEquals(0, rejectedCalled);
+            assertEquals(0, successCalled);
+            assertEquals([], args);
+        });
+
+        queue.call("Step 2: Check if only rejected cb was called", function () {
+            assertEquals(1, rejectedCalled);
+            assertEquals(1, successCalled);
+            assertEquals([1, 2], args);
+        });
+    };
 }());
